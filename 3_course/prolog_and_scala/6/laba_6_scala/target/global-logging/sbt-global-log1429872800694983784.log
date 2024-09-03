@@ -1,0 +1,11 @@
+[debug] > Exec(Qete, None, None)
+[error] Not a valid command: Qete (similar: set, exit)
+[error] Not a valid project ID: Qete
+[error] Expected ':'
+[error] Expected '/'
+[error] Not a valid key: Qete (similar: test, evicted, state)
+[error] Qete
+[error]     ^
+[debug] > Exec(idea-shell, None, None)
+[debug] > Exec(, None, None)
+[debug] > Exec(idea-shell, None, None)

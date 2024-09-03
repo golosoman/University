@@ -1,0 +1,1533 @@
+% Предметная область – спортивные соревнования.
+% Каждое соревнование может быть описано структурой: ранг соревнований, вид спорта,
+% год проведения, страна проведения, список команд - участников. Команды
+% - участники могут быть описаны следующей структурой: название команды,
+% страна, результаты соревнований. Результаты соревнований могут быть
+% описаны списком структур: название команды – соперника, страна, тип
+% результата (выигрыш, проигрыш, ничья). Реализовать следующие типы
+% запросов:
+
+% Библиотека для работы с БД
+:- use_module(library(odbc)).
+
+% Библиотеки для работы с http
+:-use_module(library(http/http_server)).
+:-use_module(library(http/http_dispatch)).
+:-use_module(library(http/http_parameters)).
+:-use_module(library(http/html_write)).
+
+% Покдючение к БД
+connect_db(Connection):-
+    odbc_connect(
+        'swi',
+        Connection,
+        [
+            user(postgres),
+            password(root),
+            alias(dsn),
+            open(once)
+        ]
+    ).
+
+% Задание 1
+% На основе 3 лабораторной работы создать базу данных о заданной
+% предметной области в виде таблиц. Таблицы должны создаваться используя
+% соответствующие предикаты.
+
+%Создание таблиц
+create_tables :-
+    connect_db(_),
+    odbc_query(
+        dsn,
+        'CREATE TABLE public.competition
+        (
+	  id SERIAL NOT NULL,
+	  name TEXT NOT NULL,
+	  type_sport TEXT NOT NULL,
+	  year INTEGER NOT NULL,
+	  country TEXT NOT NULL,
+	  PRIMARY KEY (id)
+         )'
+    ),
+    odbc_query(
+        dsn,
+        'CREATE TABLE public.team
+        (
+	  id SERIAL NOT NULL,
+	  name TEXT NOT NULL,
+	  country TEXT NOT NULL,
+	  PRIMARY KEY (id)
+         )'
+    ),
+    odbc_query(
+        dsn,
+        'CREATE TABLE public.result
+        (
+	  id SERIAL NOT NULL,
+	  opponent_name TEXT NOT NULL,
+	  country TEXT NOT NULL,
+	  type_result TEXT NOT NULL,
+	  PRIMARY KEY (id)
+         )'
+    ),
+    odbc_query(
+        dsn,
+        'CREATE TABLE public.competition_team
+        (
+	  id SERIAL NOT NULL,
+          competition_id INTEGER,
+	  teams_id INTEGER,
+	  result_id INTEGER,
+	  PRIMARY KEY (id),
+	  FOREIGN KEY (competition_id) REFERENCES competition (id),
+	  FOREIGN KEY (teams_id) REFERENCES team (id),
+	  FOREIGN KEY (result_id) REFERENCES result (id)
+         )'
+    ),
+    odbc_disconnect(dsn).
+
+% Удаление таблиц
+delete_tables:-
+    connect_db(_),
+    odbc_query(
+        dsn,
+        'DROP TABLE IF EXISTS public.competition, public.team, public.result, public.competition_team'
+    ),
+    odbc_disconnect(dsn).
+
+% Вставка данных в таблицы (значения)
+insert_data_in_tables:-
+     connect_db(_),
+    odbc_query(
+        dsn,
+        'INSERT INTO competition (name, type_sport, year, country)
+         VALUES
+         (\'Olympic Games\', \'Athletics\', 2024, \'France\'),
+         (\'Championship\', \'Football\', 2020, \'England\'),
+         (\'Championship\', \'Basketball\', 2021, \'USA\'),
+         (\'Friendly Match\', \'Football\', 2022, \'Russia\'),
+         (\'Tournament\', \'Volleyball\', 2023, \'Brazil\'),
+         (\'Olympic Games\', \'Wrestling\', 2016, \'USA\')'
+    ),
+    odbc_query(
+        dsn,
+        'INSERT INTO team (name, country)
+        VALUES
+        (\'USA National Team\', \'USA\'),
+        (\'Germany National Team\', \'Germany\'),
+        (\'Jamaica National Team\', \'Jamaica\'),
+        (\'England National Team\', \'England\'),
+        (\'France National Team\', \'France\'),
+        (\'Spain National Team\', \'Spain\'),
+        (\'Canada National Team\', \'Canada\'),
+        (\'Mexico National Team\', \'Mexico\'),
+        (\'Zenit\', \'Russia\'),
+        (\'Spartak\', \'Russia\'),
+        (\'Nova Serrana\', \'Brazil\'),
+        (\'Ekip Jenkins\', \'Brazil\'),
+        (\'Trez Volley\', \'Brazil\'),
+        (\'USA Team\', \'USA\'),
+        (\'Russia Team\', \'Russia\'),
+        (\'Denmark Team\', \'Denmark\'),
+        (\'Japan Team\', \'Japan\'),
+        (\'Cuba Team\', \'Cuba\'),
+        (\'Turkey Team\', \'Turkey\')'
+    ),
+    odbc_query(
+        dsn,
+        'INSERT INTO result (opponent_name, country, type_result)
+        VALUES
+        (\'Germany National Team\', \'Germany\', \'Win\'),
+        (\'Jamaica National Team\', \'Jamaica\', \'Win\'),
+        (\'USA National Team\', \'USA\', \'Loss\'),
+        (\'Jamaica National Team\', \'Jamaica\', \'Loss\'),
+        (\'USA National Team\', \'USA\', \'Loss\'),
+        (\'Germany National Team\', \'Germany\', \'Win\'),
+        (\'France National Team\', \'France\', \'Win\'),
+        (\'Spain National Team\', \'Spain\', \'Loss\'),
+        (\'England National Team\', \'England\', \'Loss\'),
+        (\'Spain National Team\', \'Spain\', \'Loss\'),
+        (\'England National Team\', \'England\', \'Win\'),
+        (\'France National Team\', \'France\', \'Win\'),
+        (\'Canada National Team\', \'Canada\', \'Win\'),
+        (\'Mexico National Team\', \'Mexico\', \'Win\'),
+        (\'France National Team\', \'France\', \'Loss\'),
+        (\'USA National Team\', \'USA\', \'Loss\'),
+        (\'Mexico National Team\', \'Mexico\', \'Draw\'),
+        (\'France National Team\', \'France\', \'Win\'),
+        (\'USA National Team\', \'USA\', \'Loss\'),
+        (\'Canada National Team\', \'Canada\', \'Draw\'),
+        (\'France National Team\', \'France\', \'Win\'),
+        (\'USA National Team\', \'USA\', \'Win\'),
+        (\'Canada National Team\', \'Canada\', \'Loss\'),
+        (\'Mexico National Team\', \'Mexico\', \'Loss\'),
+        (\'Spartak\', \'Russia\', \'Win\'),
+        (\'Zenit\', \'Russia\', \'Loss\'),
+        (\'Equipe Jenkins\', \'Brazil\', \'Loss\'),
+        (\'Three Volley\', \'Brazil\', \'Win\'),
+        (\'Nova Serrana\', \'Brazil\', \'Win\'),
+        (\'Three Volley\', \'Brazil\', \'Draw\'),
+        (\'Equipe Jenkins\', \'Brazil\', \'Draw\'),
+        (\'Nova Serrana\', \'Brazil\', \'Loss\'),
+        (\'Team Japan\', \'Japan\', \'Loss\'),
+        (\'Team Denmark\', \'Denmark\', \'Win\'),
+        (\'Team Russia\', \'Russia\', \'Loss\'),
+        (\'Team USA\', \'USA\', \'Win\'),
+        (\'Team Turkey\', \'Turkey\', \'Win\'),
+        (\'Team Cuba\', \'Cuba\', \'Loss\')'
+    ),
+    odbc_query(
+        dsn,
+        'INSERT INTO competition_team (competition_id, teams_id, result_id)
+        VALUES
+        (1, 1, 1),
+        (1, 1, 2),
+        (1, 2, 3),
+        (1, 2, 4),
+        (1, 3, 5),
+        (1, 3, 6),
+        (2, 4, 7),
+        (2, 4, 8),
+        (2, 5, 9),
+        (2, 5, 10),
+        (2, 6, 11),
+        (2, 6, 12),
+        (3, 1, 13),
+        (3, 1, 14),
+        (3, 1, 15),
+        (3, 7, 16),
+        (3, 7, 17),
+        (3, 7, 18),
+        (3, 8, 19),
+        (3, 8, 20),
+        (3, 8, 21),
+        (3, 5, 22),
+        (3, 5, 23),
+        (3, 5, 24),
+        (4, 9, 25),
+        (4, 10, 26),
+        (5, 11, 27),
+        (5, 11, 28),
+        (5, 12, 29),
+        (5, 12, 30),
+        (5, 13, 31),
+        (5, 13, 32),
+        (6, 14, 33),
+        (6, 15, 34),
+        (6, 16, 35),
+        (6, 17, 36),
+        (6, 18, 37),
+        (6, 19, 38)'
+    ),
+    odbc_disconnect(dsn).
+
+%Вставка данных в таблицу competition
+insert_competition(Name, TypeSport, Year, Country):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        "INSERT INTO public.competition (name, type_sport, year, country) VALUES (?, ?, ?, ?)",
+        [varchar, varchar, integer, varchar],
+        Statement
+    ),
+    odbc_execute(Statement, [Name, TypeSport, Year, Country]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+%Вставка данных в таблицу team
+insert_team(Name, Country):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'INSERT INTO public.team (name, country) VALUES (?, ?)',
+        [varchar, varchar],
+        Statement
+    ),
+    odbc_execute(Statement, [Name, Country]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+
+%Вставка данных в таблицу result
+insert_result(OpponentName, Country, TypeResult):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'INSERT INTO result (opponent_name, country, type_result) VALUES (?, ?, ?)',
+        [varchar, varchar, varchar],
+        Statement
+    ),
+    odbc_execute(Statement, [OpponentName, Country, TypeResult]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+%Вставка данных в таблицу competition_team
+insert_competition_team(CompetitionId, TeamId, ResultId):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'INSERT INTO competition_team (competition_id, teams_id, result_id) VALUES (?, ?, ?)',
+        [integer, integer, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [CompetitionId, TeamId, ResultId]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+
+% Задание 2
+% Разработать набор sql запросов, при помощи которых можно реализовать
+% все запросы, приведенные в варианте задания к лабораторной 3.
+
+% Чтение всех строк с одним полем из prepared statement
+% Определение предиката processed_fetch_data с аккумулятором для записи
+% данных в массив
+processed_fetch_data(Statement, Data) :-
+    processed_fetch_data_acc(Statement, [], Data).
+
+% Определение вспомогательного предиката processedFetchDataAcc/3 с аккумулятором для накопления данных
+processed_fetch_data_acc(Statement, Acc, Result) :-
+    odbc_fetch(Statement, Row, next),
+    ( Row == end_of_file -> Result = Acc;  % Если достигнут конец файла, возвращаем собранный массив
+       extract_data(Row, ExtractedData),
+       append(Acc, [ExtractedData], NewAcc),  % Добавляем данные в массив
+       processed_fetch_data_acc(Statement, NewAcc, Result)
+    ).
+
+% pattern matchin для строки вида для запросов получения данных
+extract_data(row(Data), Data).
+extract_data(row(Data_1, Data_2, Data_3), [Data_1, Data_2, Data_3]).
+extract_data(row(Data_1, Data_2, Data_3, Data_4), [Data_1, Data_2, Data_3, Data_4]).
+extract_data(row(Data_1, Data_2, Data_3, Data_4, Data_5), [Data_1, Data_2, Data_3, Data_4, Data_5]).
+extract_data(row(Data_1, Data_2, Data_3, Data_4, Data_5, Data_6, Data_7, Data_8, Data_9, Data_10), [Data_1, Data_2, Data_3, Data_4, Data_5, Data_6, Data_7, Data_8, Data_9, Data_10]).
+
+% 1 Найти год, в который участвовало максимальное число команд, в
+% заданном ранге соревнований;
+select_task_1(Rank, Data) :-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT max(subquery.year) as year
+        FROM (
+            SELECT competition.year as year, COUNT(DISTINCT team.name) AS num_teams
+            FROM competition
+            INNER JOIN competition_team ON competition.id = competition_team.competition_id
+            INNER JOIN team ON competition_team.teams_id = team.id
+            WHERE competition.name = (?)
+            GROUP BY year
+            ORDER BY num_teams DESC
+        ) AS subquery',
+        [varchar],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, [Rank]),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+% 2 Найти вид спорта, в котором выступает заданная команда;
+select_task_2(TeamName, Data) :-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT DISTINCT competition.type_sport
+        FROM competition
+        INNER JOIN competition_team ON competition.id = competition_team.competition_id
+        INNER JOIN team ON competition_team.teams_id = team.id
+        WHERE team.name = (?)',
+        [varchar],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, [TeamName]),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+% 3 Найти все команды, которые участвовали в Олимпийских играх по
+% определенному виду спорта;
+select_task_3(SportName, Data) :-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT DISTINCT team.name
+        FROM team
+        INNER JOIN competition_team ON team.id = competition_team.teams_id
+        INNER JOIN competition ON competition_team.competition_id = competition.id
+        WHERE competition.name = (?) and competition.type_sport = (?)',
+        [varchar, varchar],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, ['Olympic Games', SportName]),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+% 4 Найти все команды, участвовавшие в соревнованиях в заданном году;
+select_task_4(Year, Data) :-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT DISTINCT team.name
+        FROM team
+        INNER JOIN competition_team ON competition_team.teams_id = team.id
+        INNER JOIN competition ON competition_team.competition_id = competition.id
+        WHERE competition.year = (?)',
+        [integer],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, [Year]),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+% 5 Найти все команды определенной страны, у которых были выигрыши.
+select_task_5(Country, Data) :-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT DISTINCT team.name
+        FROM team
+        INNER JOIN competition_team ON competition_team.teams_id = team.id
+        INNER JOIN competition ON competition_team.competition_id = competition.id
+        INNER JOIN result ON competition_team.result_id = result.id
+        WHERE result.type_result = (?) AND team.country = (?)',
+        [varchar, varchar],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, ['Win', Country]),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+% Закрыть prepared statement и connection
+close_conn(Connection, Statement):-
+    odbc_free_statement(Statement),
+    odbc_disconnect(Connection).
+
+% Задание 3
+% Используя HTTP server libraries
+% написать CRUD (Create/Read/Update/Delete) для всех таблиц базы данных.
+% Предоставить пользователю возможность сбросить базу данных к исходному
+% (тестовому) варианту заполнения.
+
+% Запуск сервера
+server(Port):- http_server(http_dispatch, [port(Port)]).
+server:-server(8080).
+
+% Остановка сервера
+stop(Port):- http_stop_server(Port, http_dispatch).
+stop:- stop(8080).
+
+% Хэндлер для ресета БД
+:- http_handler(root(reset_db), reset_db, [method(post)]).
+
+% Сброс БД до исходного состояния
+reset_db(_):-
+    delete_tables,
+    create_tables,
+    insert_data_in_tables,
+    http_redirect(moved, '/', _Request).
+
+create_competition(Name, TypeSport, Year, Country):-
+    insert_competition(Name, TypeSport, Year, Country).
+
+create_teams(Name, Country):-
+    insert_team(Name, Country).
+
+create_results(OpponentName, Country, TypeResult):-
+    insert_result(OpponentName, Country, TypeResult).
+
+create_competition_team(CompetitionId, TeamId, ResultId):-
+    insert_competition_team(CompetitionId, TeamId, ResultId).
+
+read_all(Data):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT competition_team.competition_id || \' \' || competition_team.teams_id
+        || \' \' || competition_team.result_id as "id", competition.name as "Ранг",
+        competition.type_sport as "Вид спорта", competition.year as "Год проведения",
+        competition.country as "Страна проведения", team.name as "Команда",
+        team.country as "Страна команды", result.opponent_name as "Команда оппонет",
+        result.country as "Страна оппонента", result.type_result as "Результат"
+        FROM competition
+        INNER JOIN competition_team ON competition.id = competition_team.competition_id
+        INNER JOIN team ON competition_team.teams_id = team.id
+        INNER JOIN result ON competition_team.result_id = result.id',
+        [],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, []),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+read_competition(Data):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT competition.id as "id", competition.name as "Ранг",
+        competition.type_sport as "Вид спорта", competition.year as "Год проведения",
+        competition.country as "Страна проведения"
+        FROM competition',
+        [],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, []),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+read_teams(Data):-
+   connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT team.id as "id", team.name as "Команда", team.country as "Страна команды"
+        FROM team',
+        [],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, []),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+read_results(Data):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT result.id as "id", result.opponent_name as "Команда оппонет",
+        result.country as "Страна оппонента", result.type_result as "Результат"
+        FROM result',
+        [],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, []),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+read_competition_team(Data):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'SELECT competition_team.competition_id AS "id Соревнования",
+        competition_team.teams_id AS "id Команды",
+        competition_team.result_id AS "id Результата"
+        FROM competition_team',
+        [],
+        Statement,
+        [fetch(fetch)]
+    ),
+    odbc_execute(Statement, []),
+    processed_fetch_data(Statement, Data),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+
+update_competition(Id, Name, TypeSport, Year, Country):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE competition
+        SET name = (?), type_sport = (?), year = (?), country = (?)
+        WHERE competition.id = (?)',
+        [varchar, varchar, integer, varchar, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [Name, TypeSport, Year, Country, Id]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+update_teams(Id, Name, Country):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE team
+        SET name = (?), country = (?)
+        WHERE id = (?)',
+        [varchar, varchar, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [Name, Country, Id]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+update_results(Id, OpponentName, Country, TypeResult):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE result
+        SET opponent_name = (?), country = (?), type_result = (?)
+        WHERE id = (?)',
+        [varchar, varchar, varchar, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [OpponentName, Country, TypeResult, Id]),
+    %Закрыть prepared statement и connection
+    close_conn(Connection, Statement).
+
+
+% Может произайти неизвестное
+delete_competition(Id):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE competition_team
+        SET competition_id = NULL
+        WHERE competition_id = (?);
+
+        DELETE FROM competition
+        WHERE id = (?)',
+        [integer, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [Id, Id]),
+    close_conn(Connection, Statement).
+
+delete_teams(Id):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE competition_team
+        SET teams_id = NULL
+        WHERE teams_id = (?);
+
+        DELETE FROM team
+        WHERE id = (?)
+        ',
+        [integer, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [Id, Id]),
+    close_conn(Connection, Statement).
+
+
+delete_results(Id):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'UPDATE competition_team
+        SET result_id = NULL
+        WHERE result_id = (?);
+
+        DELETE FROM result
+        WHERE id = (?)
+        ',
+        [integer, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [Id, Id]),
+    close_conn(Connection, Statement).
+
+delete_competition_team(CompetitionId, TeamId, ResultId):-
+    connect_db(Connection),
+    odbc_prepare(
+        Connection,
+        'DELETE FROM competition_team
+          WHERE id =
+          (
+            SELECT id FROM competition_team
+            WHERE competition_team.competition_id = (?) AND
+	    competition_team.teams_id = (?) AND competition_team.result_id = (?)
+         )',
+        [integer, integer, integer],
+        Statement
+    ),
+    odbc_execute(Statement, [CompetitionId, TeamId, ResultId]),
+    close_conn(Connection, Statement).
+
+% Задание 4 Реализовать вывод
+% результатов всех поисковых запросов к базе данных на html страницах.
+
+% Хэндлер для корневой страницы
+:- http_handler(root(.), home_page, []).
+
+% Базовый случай: преобразование пустого массива Data. Data - массив
+% массивов
+generate_rows([], []).
+
+% Рекурсивный случай: преобразование массива Data в массив Row
+generate_rows([Data | Tail], [Row | Result]) :-
+    generate_row(Data, Row),  % Переводим массив Data в строку Row
+    generate_rows(Tail, Result).  % Рекурсивный вызов для оставшихся элементов
+
+% Предикат для преобразования массива Data в строку Row
+generate_row(Data, Row) :-
+    maplist(construct_td, Data, TdStrings),  % Преобразование каждого элемента в тег td
+    Row = tr(TdStrings).
+
+% Предикат для создания тега td с данными
+construct_td(Data, td(Data)).
+
+% Добавление элемента в начало списка
+ins(L, El, [El|L]).
+
+% Обработка главной страницы
+home_page(_Request):-
+    read_all(Data),
+    generate_rows(Data, Row),
+    ins(Row, tr(
+                  [
+                    th('id'),
+                    th('Ранг Соревнования'),
+                    th('Вид спорта'),
+                    th('Год'),
+                    th('Страна проведения'),
+                    th('Команда'),
+                    th('Страна'),
+                    th('Оппонент'),
+                    th('Страна оппонента'),
+                    th('Результат')
+                  ]
+              ), Rows_with_Headers),
+
+    reply_html_page(
+        title('Таблица спортивных соревнований'),
+        [
+            h1('Спортивные соревнования'),
+
+            h3('Задания варианта'),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/max_teams_year_find')], 'Task_1'))
+            ),
+
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/sport_by_team_find')], 'Task_2'))
+            ),
+
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/olympc_teams_by_sport_find')], 'Task_3'))
+            ),
+
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/teams_in_year_find')], 'Task_4'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/winning_teams_by_country_find')], 'Task_5'))
+            ),
+
+            br(''),
+
+            h3('CRUD - CREAT/READ/UPDATE/DELETE'),
+            h4('Сброс базы данных к изначальному состоянию'),
+            form(
+                [style('display: inline-block'), method(post)],
+                p(button([type(submit), formaction(location_by_id('reset_db'))], 'Сбросить БД'))
+            ),
+
+            br(''),
+
+            h4('Блок чтения данных из таблиц'),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/read_competitions')], 'Посмотреть соревнования'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/read_teams')], 'Посмотреть команды'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/read_results')], 'Посмотреть результаты'))
+            ),
+
+            br(''),
+
+            h4('Блок добавления данных в таблицы'),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/add_competition_fill')], 'Добавить соревнование'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/add_team_fill')], 'Добавить команду'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/add_result_fill')], 'Добавить результат'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/add_competition_teams_fill')], 'Связать таблицы'))
+            ),
+
+            br(''),
+
+            h4('Блок изменения данных в таблицах'),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/update_competition_find')], 'Изменить соревнование'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/update_team_find')], 'Изменить команду'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/update_result_find')], 'Изменить результат'))
+            ),
+
+            br(''),
+
+            h4('Блок удаления данных в таблицах'),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/delete_competition_find')], 'Удалить соревнование'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/delete_team_find')], 'Удалить команду'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/delete_result_find')], 'Удалить результат'))
+            ),
+            form(
+                [style('display: inline-block')],
+                p(button([type(submit), formaction('/delete_full_data_find')], 'Удалить связь'))
+            ),
+
+            h3('Таблица'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]).
+
+% Для Task_1
+% Хэндлер странички для ввода данных для поиска года, с максимальным
+% числом команд
+:- http_handler(root(max_teams_year_find), max_teams_year_find_page, []).
+% Хэндлер поиска года, в который учавствовало максимальное число комад
+:- http_handler(root(max_teams_year), max_teams_year_page, [method(post)]).
+
+max_teams_year_find_page(_Request):-
+   reply_html_page(
+        title('Ввод ранга соревнований'),
+        [form(
+            [action=location_by_id(max_teams_year_page), method(post)],
+            [
+                h2('Найти год, в который участвовало максимальное число команд, в заданном ранге соревнований'),
+                table([
+                    tr([th('Ранг'), td(input([name(rank)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Искать'])))
+                ] )
+            ]
+        )]
+    ).
+
+% Data - массив простых данных, не содержит подмассивов, каждый элемент
+% - новая строка
+convert_to_row([], []).
+convert_to_row([Data_head | Data_tail], [tr(td(Data_head)) | Row_tail]) :-
+    convert_to_row(Data_tail, Row_tail).
+
+max_teams_year_page(Request):-
+   http_parameters(
+        Request,
+        [
+            rank(Rank, [])
+        ]
+    ),
+   select_task_1(Rank, Year),
+   convert_to_row(Year, YearRow),
+   ins(YearRow, tr(
+                  [
+                    th('Год')
+                  ]
+              ), Rows_with_Headers),
+    reply_html_page(
+        title('Год, с максимальным числом команд'),
+        [
+            h1('Год, с максимальным числом команд'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]
+    ).
+
+% Для Task 2
+% Хэндлер странички для ввода данных для поиска вида спорта, в котором
+% выступает заданная команда
+:- http_handler(root(sport_by_team_find), sport_by_team_find_page, []).
+% Хэндлер поиска вида спорта, в котором выступает заданная команда
+:- http_handler(root(sport_by_team), sport_by_team_page, [method(post)]).
+
+sport_by_team_find_page(_Request):-
+   reply_html_page(
+        title('Ввод названия команды'),
+        [form(
+            [action=location_by_id(sport_by_team_page), method(post)],
+            [
+                h2('Найти вид спорта, в котором выступает заданная команда'),
+                table([
+                    tr([th('Название команды'), td(input([name(teamName)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Искать'])))
+                ] )
+            ]
+        )]
+    ).
+
+sport_by_team_page(Request):-
+   http_parameters(
+        Request,
+        [
+            teamName(TeamName, [])
+        ]
+    ),
+   select_task_2(TeamName, TypeSport),
+   convert_to_row(TypeSport, SportRow),
+   ins(SportRow, tr(
+                  [
+                    th('Вид спорта')
+                  ]
+              ), Rows_with_Headers),
+    reply_html_page(
+        title('Вид спорта, в котором выступает заданная команда'),
+        [
+            h1('Вид спорта, в котором выступает заданная команда'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]
+    ).
+
+% Для Task 3
+% Хэндлер странички для ввода данных для поиска всех команд, которые
+% учавствовали в Олимпийских играх в определенном виде спорта
+:- http_handler(root(olympc_teams_by_sport_find), olympc_teams_by_sport_find_page, []).
+% Хэндлер поиска всех команд, которые учавствовали в Олимпийких играх в
+% определенном виде спорта
+:- http_handler(root(olympc_teams_by_sport), olympc_teams_by_sport_page, [method(post)]).
+
+olympc_teams_by_sport_find_page(_Request):-
+   reply_html_page(
+        title('Ввод названия спорта'),
+        [form(
+            [action=location_by_id(olympc_teams_by_sport_page), method(post)],
+            [
+                h2('Найти все команды, которые участвовали в Олимпийских играх по определенному виду спорта'),
+                table([
+                    tr([th('Название вида спорта'), td(input([name(sport)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Искать'])))
+                ] )
+            ]
+        )]
+    ).
+
+olympc_teams_by_sport_page(Request):-
+   http_parameters(
+        Request,
+        [
+            sport(Sport, [])
+        ]
+    ),
+   select_task_3(Sport, Teams),
+   convert_to_row(Teams, TeamsRow),
+   ins(TeamsRow, tr(
+                  [
+                    th('Название команды')
+                  ]
+              ), Rows_with_Headers),
+    reply_html_page(
+        title('Команды, участвующие в Олимпийских играх в определенном виде спорта'),
+        [
+            h1('Команды, которые участвовали в Олимпийских играх в определенном виде спорта'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]
+    ).
+
+% Для Task 4
+% Хэндлер странички для ввода данных для поиска всех команд, которые
+% учавствовали в заданном году
+:- http_handler(root(teams_in_year_find), teams_in_year_find_page, []).
+% Хэндлер поиска всех команд, учавствоваших в соревнованиях в заданном
+% году
+:- http_handler(root(teams_in_year), teams_in_year_page, [method(post)]).
+
+teams_in_year_find_page(_Request):-
+   reply_html_page(
+        title('Ввод года'),
+        [form(
+            [action=location_by_id(teams_in_year_page), method(post)],
+            [
+                h2('Найти все команды, участвовавшие в соревнованиях в заданном году'),
+                table([
+                    tr([th('Год'), td(input([name(year), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Искать'])))
+                ] )
+            ]
+        )]
+    ).
+
+teams_in_year_page(Request):-
+   http_parameters(
+        Request,
+        [
+            year(Year, [])
+        ]
+    ),
+   atom_number(Year, Number),
+   select_task_4(Number, Teams),
+   convert_to_row(Teams, TeamsRow),
+   ins(TeamsRow, tr(
+                  [
+                    th('Название команды')
+                  ]
+              ), Rows_with_Headers),
+    reply_html_page(
+        title('Команды, участвовавшие в соревнованиях в заданном году'),
+        [
+            h1('Команды, участвовавшие в соревнованиях в заданном году'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]
+    ).
+
+% Для Task 5
+% Хэндлер странички для ввода данных для поиска всех команд определенной
+% страны, у которых были выигрыши
+:- http_handler(root(winning_teams_by_country_find), winning_teams_by_country_find_page, []).
+
+% Хэндлер поиска всех команд определенной страны, у которых были
+% выигрыши
+:- http_handler(root(winning_teams_by_country), winning_teams_by_country_page, [method(post)]).
+
+winning_teams_by_country_find_page(_Request):-
+   reply_html_page(
+        title('Ввод страны'),
+        [form(
+            [action=location_by_id(winning_teams_by_country_page), method(post)],
+            [
+                h2('Найти все команды определенной страны, у которых были выигрыши'),
+                table([
+                    tr([th('Страна'), td(input([name(country)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Искать'])))
+                ] )
+            ]
+        )]
+    ).
+
+winning_teams_by_country_page(Request):-
+   http_parameters(
+        Request,
+        [
+            country(Country, [])
+        ]
+    ),
+   select_task_5(Country, Teams),
+   convert_to_row(Teams, TeamsRow),
+   ins(TeamsRow, tr(
+                  [
+                    th('Название команды')
+                  ]
+              ), Rows_with_Headers),
+    reply_html_page(
+        title('Команды определенной страны, у которых были выигрыши'),
+        [
+            h1('Команды определенной страны, у которых были выигрыши'),
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]
+    ).
+
+% Реализация страничек получения таблиц
+% Хэдлер для странички с информацией о спортивных соревнованиях
+:- http_handler(root(read_competitions), read_competition_page, []).
+
+read_competition_page(_Request):-
+    % Добавляем заголовки таблицы
+    read_competition(Data),
+    generate_rows(Data, Row),
+
+    ins(Row, tr(
+                  [
+                    th('id'),
+                    th('Ранг Соревнования'),
+                    th('Вид спорта'),
+                    th('Год'),
+                    th('Страна проведения')                  ]
+              ), Rows_with_Headers),
+
+    reply_html_page(
+        title('Таблица спортивных соревнований'),
+        [
+            h1('Спортивные соревнования'),
+
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]).
+
+% Хэдлер для странички с информацией о спортивных командах
+:- http_handler(root(read_teams), read_teams_page, []).
+
+read_teams_page(_Request):-
+    % Добавляем заголовки таблицы
+    read_teams(Data),
+    generate_rows(Data, Row),
+
+    ins(Row, tr(
+                  [
+                    th('id'),
+                    th('Название команды'),
+                    th('Страна команды')                ]
+              ), Rows_with_Headers),
+
+    reply_html_page(
+        title('Таблица спортивных команд'),
+        [
+            h1('Команды'),
+
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]).
+
+% Хэдлер для странички с информацией о результатах соревнований
+:- http_handler(root(read_results), read_results_page, []).
+
+
+read_results_page(_Request):-
+    % Добавляем заголовки таблицы
+    read_results(Data),
+    generate_rows(Data, Row),
+
+    ins(Row, tr(
+                  [
+                    th('id'),
+                    th('Название команды оппонента'),
+                    th('Страна команды оппонента'),
+                    th('Результат')
+             ]
+              ), Rows_with_Headers),
+
+    reply_html_page(
+        title('Таблица результатов соревнований'),
+        [
+            h1('Результаты'),
+
+            table(
+                [border(2)],
+                Rows_with_Headers
+            )
+        ]).
+
+% Реализация страничек для добавления данных в таблицы
+% Хэндлер страницы для добавления нового соревнования
+:- http_handler(root(add_competition_fill), add_competition_fill_page, []).
+% Хэндлер для добавления нового соревнования
+:- http_handler(root(add_competition), add_competition, [method(post)]).
+
+
+% Соревнования
+add_competition_fill_page(_Request):-
+    reply_html_page(
+        title('Добавление соревнования'),
+        [form(
+            [action=location_by_id(add_competition), method(post)],
+            [
+                table([
+                    tr([th('Ранг'), td(input([name(rank)]))]),
+                    tr([th('Вид спорта'), td(input([name(sport)]))]),
+                    tr([th('Год'), td(input([name(year), type(number)]))]),
+                    tr([th('Страна'), td(input([name(country)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Добавить'])))
+                ] )
+            ]
+        )]
+    ).
+
+add_competition(Request):-
+    http_parameters(
+        Request,
+        [
+            rank(Rank, []),
+            sport(Sport, []),
+            year(Year, []),
+            country(Country, [])
+        ]
+    ),
+    atom_number(Year, Number),
+    create_competition(Rank, Sport, Number, Country),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для добавления новой команды
+:- http_handler(root(add_team_fill), add_team_fill_page, []).
+% Хэндлер для добавления нового соревнования
+:- http_handler(root(add_team), add_team, [method(post)]).
+
+% Команды
+add_team_fill_page(_Request):-
+    reply_html_page(
+        title('Добавление команды'),
+        [form(
+            [action=location_by_id(add_team), method(post)],
+            [
+                table([
+                    tr([th('Название команды'), td(input([name(team)]))]),
+                    tr([th('Страна команды'), td(input([name(country)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Добавить'])))
+                ] )
+            ]
+        )]
+    ).
+
+add_team(Request):-
+    http_parameters(
+        Request,
+        [
+            team(TeamName, []),
+            country(Country, [])
+        ]
+    ),
+    create_teams(TeamName, Country),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для добавления результата соревнований
+:- http_handler(root(add_result_fill), add_result_fill_page, []).
+% Хэндлер для добавления нового соревнования
+:- http_handler(root(add_result), add_result, [method(post)]).
+
+
+% Результаты
+add_result_fill_page(_Request):-
+    reply_html_page(
+        title('Добавление результата'),
+        [form(
+            [action=location_by_id(add_result), method(post)],
+            [
+                table([
+                    tr([th('Название команды оппонента'), td(input([name(team)]))]),
+                    tr([th('Страна команды оппонента'), td(input([name(country)]))]),
+                    tr([th('Результат'), td(input([name(result)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Добавить'])))
+                ] )
+            ]
+        )]
+    ).
+
+add_result(Request):-
+    http_parameters(
+        Request,
+        [
+            team(TeamName, []),
+            country(Country, []),
+            result(Result, [])
+        ]
+    ),
+    create_results(TeamName, Country, Result),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для добавления id-шников для связующей таблицы
+:- http_handler(root(add_competition_teams_fill), add_competition_teams_fill_page, []).
+% Хэндлер для добавления нового соревнования
+:- http_handler(root(add_competition_teams), add_competition_teams, [method(post)]).
+
+% Связующая таблица
+add_competition_teams_fill_page(_Request):-
+    reply_html_page(
+        title('Добавление id-шников для связующей таблицы'),
+        [form(
+            [action=location_by_id(add_competition_teams), method(post)],
+            [
+                table([
+                    tr([th('id Соревнования'), td(input([name(competition), type(number)]))]),
+                    tr([th('id Команды'), td(input([name(team), type(number)]))]),
+                    tr([th('id Результата'), td(input([name(result), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Добавить'])))
+                ] )
+            ]
+        )]
+    ).
+
+add_competition_teams(Request):-
+    http_parameters(
+        Request,
+        [
+            competition(CompetitionId, []),
+            team(TeamId, []),
+            result(ResultId, [])
+        ]
+    ),
+    atom_number(CompetitionId, NCompetitionId),
+    atom_number(TeamId, NTeamId),
+    atom_number(ResultId, NResultId),
+    create_competition_team(NCompetitionId, NTeamId, NResultId),
+    http_redirect(moved, '/', _Request).
+
+% Реализация страничек для изменения данных в таблицах
+% Хэндлер страницы для обновления данных в таблице соревнований
+:- http_handler(root(update_competition_find), update_competition_find_page, []).
+% Хэндлер для обновления соревнования
+:- http_handler(root(update_competition), update_competition, [method(post)]).
+
+update_competition_find_page(_Request):-
+    reply_html_page(
+        title('Изменение данных в таблице соревнований'),
+        [form(
+            [action=location_by_id(update_competition), method(post)],
+            [
+                table([
+                    tr([th('id Соревнования'), td(input([name(id), type(number)]))]),
+                    tr([th('Ранг соревнования'), td(input([name(rank)]))]),
+                    tr([th('Вид спорта'), td(input([name(sport)]))]),
+                    tr([th('Год проведения'), td(input([name(year), type(number)]))]),
+                    tr([th('Страна проведения'), td(input([name(country)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Изменить'])))
+                ] )
+            ]
+        )]
+    ).
+
+update_competition(Request):-
+    http_parameters(
+        Request,
+        [
+            id(CompetitionId, []),
+            rank(Rank, []),
+            sport(TypeSport, []),
+            year(Year, []),
+            country(Country, [])
+        ]
+    ),
+    atom_number(CompetitionId, NCompetitionId),
+    atom_number(Year, NYear),
+    update_competition(NCompetitionId, Rank, TypeSport, NYear, Country),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для обновления команды
+:- http_handler(root(update_team_find), update_team_find_page, []).
+% Хэндлер для обновления команды
+:- http_handler(root(update_team), update_team, [method(post)]).
+
+update_team_find_page(_Request):-
+    reply_html_page(
+        title('Изменение данных в таблице команд'),
+        [form(
+            [action=location_by_id(update_team), method(post)],
+            [
+                table([
+                    tr([th('id Команды'), td(input([name(id), type(number)]))]),
+                    tr([th('Название команды'), td(input([name(name)]))]),
+                    tr([th('Страна команды'), td(input([name(country)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Изменить'])))
+                ] )
+            ]
+        )]
+    ).
+
+update_team(Request):-
+    http_parameters(
+        Request,
+        [
+            id(TeamId, []),
+            name(TeamName, []),
+            country(Country, [])
+        ]
+    ),
+    atom_number(TeamId, NTeamId),
+    update_teams(NTeamId, TeamName, Country),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для обновления результата
+:- http_handler(root(update_result_find), update_result_find_page, []).
+% Хэндлер для обновления результата
+:- http_handler(root(update_result), update_result, [method(post)]).
+
+
+update_result_find_page(_Request):-
+    reply_html_page(
+        title('Изменение данных в таблице результатов'),
+        [form(
+            [action=location_by_id(update_result), method(post)],
+            [
+                table([
+                    tr([th('id Результата'), td(input([name(id), type(number)]))]),
+                    tr([th('Название команды оппонента'), td(input([name(name)]))]),
+                    tr([th('Страна оппонента'), td(input([name(country)]))]),
+                    tr([th('Результат'), td(input([name(result)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Изменить'])))
+                ] )
+            ]
+        )]
+    ).
+
+update_result(Request):-
+    http_parameters(
+        Request,
+        [
+            id(ResultId, []),
+            name(OpponentName, []),
+            country(OpponentCountry, []),
+            result(Result, [])
+        ]
+    ),
+    atom_number(ResultId, NResultId),
+    update_results(NResultId, OpponentName, OpponentCountry, Result),
+    http_redirect(moved, '/', _Request).
+
+% Реализация страничек для удаления данных в таблицах
+% Хэндлер страницы для полного удаления связанных данных
+:- http_handler(root(delete_full_data_find), delete_full_date_find_page, []).
+% Хэндлер для полного удаления связанных данных
+:- http_handler(root(delete_full_data), delete_full_data, [method(post)]).
+
+delete_full_date_find_page(_Request):-
+    reply_html_page(
+        title('Получение id-шников для связующей таблицы'),
+        [form(
+            [action=location_by_id(delete_full_data), method(post)],
+            [
+                table([
+                    tr([th('id Соревнования'), td(input([name(competition), type(number)]))]),
+                    tr([th('id Команды'), td(input([name(team), type(number)]))]),
+                    tr([th('id Результата'), td(input([name(result), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Удалить'])))
+                ] )
+            ]
+        )]
+    ).
+
+delete_full_data(Request):-
+    http_parameters(
+        Request,
+        [
+            competition(CompetitionId, []),
+            team(TeamId, []),
+            result(ResultId, [])
+        ]
+    ),
+    atom_number(CompetitionId, NCompetitionId),
+    atom_number(TeamId, NTeamId),
+    atom_number(ResultId, NResultId),
+    delete_competition_team(NCompetitionId, NTeamId, NResultId),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для удаления данных из соревнований
+:- http_handler(root(delete_competition_find), delete_competition_find_page, []).
+% Хэндлер для удаления данных из соревнований
+:- http_handler(root(delete_competition), delete_competition_method, [method(post)]).
+
+
+delete_competition_find_page(_Request):-
+    reply_html_page(
+        title('Удаление данных в таблице соревнований'),
+        [form(
+            [action=location_by_id(delete_competition_method), method(post)],
+            [
+                table([
+                    tr([th('id Соревнования'), td(input([name(id), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Удалить'])))
+                ] )
+            ]
+        )]
+    ).
+
+delete_competition_method(Request):-
+    http_parameters(
+        Request,
+        [
+            id(CompetitionId, [])
+        ]
+    ),
+    atom_number(CompetitionId, NCompetitionId),
+    delete_competition(NCompetitionId),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для удаления данных из команд
+:- http_handler(root(delete_team_find), delete_team_find_page, []).
+% Хэндлер для удаления команд
+:- http_handler(root(delete_team), delete_team_method, [method(post)]).
+
+
+delete_team_find_page(_Request):-
+    reply_html_page(
+        title('Удаление данных из таблицы команд'),
+        [form(
+            [action=location_by_id(delete_team_method), method(post)],
+            [
+                table([
+                    tr([th('id Команды'), td(input([name(id), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Удалить'])))
+                ] )
+            ]
+        )]
+    ).
+
+delete_team_method(Request):-
+    http_parameters(
+        Request,
+        [
+            id(TeamId, [])
+        ]
+    ),
+    atom_number(TeamId, NTeamId),
+    delete_teams(NTeamId),
+    http_redirect(moved, '/', _Request).
+
+% Хэндлер страницы для удаления данных из таблицы результатов
+:- http_handler(root(delete_result_find), delete_result_find_page, []).
+% Хэндлер для удаления результатов
+:- http_handler(root(delete_result), delete_result_method, [method(post)]).
+
+
+delete_result_find_page(_Request):-
+    reply_html_page(
+        title('Удаление данных из таблицы результатов'),
+        [form(
+            [action=location_by_id(delete_result_method), method(post)],
+            [
+                table([
+                    tr([th('id Результата'), td(input([name(id), type(number)]))]),
+                    tr(td([colspan(2), align(right)], input([type=submit, value='Удалить'])))
+                ] )
+            ]
+        )]
+    ).
+
+delete_result_method(Request):-
+    http_parameters(
+        Request,
+        [
+            id(ResultId, [])        ]
+    ),
+    atom_number(ResultId, NResultId),
+    delete_results(NResultId),
+    http_redirect(moved, '/', _Request).
+
+
+
+
+
+
+
+
+
+

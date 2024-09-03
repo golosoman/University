@@ -1,0 +1,8 @@
+[debug] > Exec(vso, None, None)
+[error] Not a valid command: vso (similar: set)
+[error] Not a valid project ID: vso
+[error] Expected ':'
+[error] Not a valid key: vso (similar: version, sLog, ps)
+[error] vso
+[error]    ^
+[debug] > Exec(idea-shell, None, None)

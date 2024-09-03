@@ -1,0 +1,8 @@
+[debug] > Exec(qsp, None, None)
+[error] Not a valid command: qsp (similar: set)
+[error] Not a valid project ID: qsp
+[error] Expected ':'
+[error] Not a valid key: qsp (similar: skip, ps)
+[error] qsp
+[error]    ^
+[debug] > Exec(idea-shell, None, None)

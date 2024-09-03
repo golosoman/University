@@ -1,0 +1,55 @@
+% Программа вставки заданного элемента в список на N-ую позицию
+
+% Подключяем библиотеку для gui
+:-use_module(library(pce)).
+
+% Создаем диалоговое окно, которое включает: поле для ввода позиции
+% вставки элемента(число), текстовое поле для ввода элемента, который
+% хотим вставить, кнопку вставить и кнопку закрытия диалогового окна
+create_gui:-
+    new(D, dialog('Программа вставки элемента в список')),
+    send(D, append, new(List, text_item('Список:'))),
+    send(D, append, new(Position, int_item('Позиция:', low:=0))),
+    send(D, append, new(Element, text_item('Элемент:'))),
+    send(D, append, button('Вставить', message(@prolog, insert_element, Position?selection, Element?selection, List?selection))),
+    send(D, append, button('Выход', message(D, destroy))),
+    send(D, open).
+
+insert_element(Position, Element, List):-
+    atom_codes(List, Codes),
+    read_from_codes(Codes, L),
+    insert_in(Element, Position, L, Result),
+    format('Вставить элемент на позицию ~d: ~w~n', [Position, Element]),
+    format('Результирующий список: ~w~n', [Result]).
+
+% в insert_in Element - вставляемый элемент, N - позиция элемента, List
+% - исходный список, Result - результирующий список
+insert_in(Element, 0, List, [Element|List]).
+insert_in(Element, N, [Head|Tail], [Head|Result]):- N>0, N1 is N-1, insert_in(Element, N1, Tail, Result).
+insert_in(_, N, List, List) :- length(List, Len), N >= Len.
+
+
+% Юнит Тесты для предиката insert_in
+%:-use_module(plunit).
+:-begin_tests(insert_in).
+
+test(insert_in_empty_list, [true(Result = [a])]) :-
+    insert_in(a, 0, [], Result).
+
+test(insert_in_beginning, [true(Result = [a, b, c, d, e])]) :-
+    insert_in(a, 0, [b, c, d, e], Result).
+
+test(insert_in_middle, [true(Result = [b, c, a, d, e])]) :-
+    insert_in(a, 2, [b, c, d, e], Result).
+
+test(insert_in_end, [true(Result = [b, c, d, e, a])]) :-
+    insert_in(a, 4, [b, c, d, e], Result).
+
+test(out_of_bounds, [true(Result=[a, b, c])]) :-
+    insert_in(element_to_insert, 10, [a, b, c], Result).
+
+:- end_tests(insert_in).
+
+
+
+
